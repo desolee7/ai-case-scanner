@@ -1,3 +1,4 @@
+```markdown
 # Ai cases
 
 Система автоматического сбора и анализа данных для выявления AI-кейсов в госзакупках, хакатонах и новостях.
@@ -6,35 +7,41 @@
 
 ```
 Autoparsing/
+├── analytics/               # Аналитический модуль
+│   ├── config.py            # Настройки LLM
+│   ├── llm_client.py        # Клиент к модели (Ollama)
+│   ├── analyzer.py          # Логика анализа и сохранения
+│   └── run.py               # Точка входа
 ├── shared/
-│   ├── config.py          # Общие настройки
-│   ├── models.py          # Модели БД (SQLAlchemy)
-│   ├── database.py        # Работа с PostgreSQL
-│   ├── import_data.py     # Импорт JSON в БД
-│   └── view_db.py         # Просмотр содержимого БД
+│   ├── config.py            # Общие настройки
+│   ├── models.py            # Модели БД (SQLAlchemy)
+│   ├── database.py          # Работа с PostgreSQL
+│   ├── import_data.py       # Импорт JSON в БД
+│   └── view_db.py           # Просмотр содержимого БД
 ├── goszakupki/
-│   ├── api_client.py      # Клиент Clearspending API
+│   ├── api_client.py        # Клиент Clearspending API
 │   ├── download_documents.py  # Скачивание файлов
-│   ├── filters.py         # Ключевые слова и фильтры
-│   ├── config.py          # Настройки модуля
-│   ├── run.py             # Точка входа
-│   └── data/              # Сохранённые JSON и документы
+│   ├── filters.py           # Ключевые слова и фильтры
+│   ├── config.py            # Настройки модуля
+│   ├── run.py               # Точка входа
+│   └── data/                # Сохранённые JSON и документы
 ├── hackathons/
-│   ├── kaggle_scraper.py  # Сбор с Kaggle API
-│   ├── parser.py          # Фильтрация и нормализация
-│   ├── filters.py         # Ключевые слова
-│   ├── config.py          # Настройки модуля
-│   ├── run.py             # Точка входа
-│   └── data/              # Сохранённые JSON
+│   ├── kaggle_scraper.py    # Сбор с Kaggle API
+│   ├── parser.py            # Фильтрация и нормализация
+│   ├── filters.py           # Ключевые слова
+│   ├── config.py            # Настройки модуля
+│   ├── run.py               # Точка входа
+│   └── data/                # Сохранённые JSON
 ├── news/
-│   ├── rss_parser.py      # Парсер RSS-лент
-│   ├── config.py          # Настройки модуля
-│   ├── run.py             # Точка входа
-│   └── data/              # Сохранённые JSON
-├── run_all.py             # Планировщик всех модулей
-├── requirements.txt       # Зависимости
-└── README.md              # Этот файл
-
+│   ├── rss_parser.py        # Парсер RSS-лент
+│   ├── config.py            # Настройки модуля
+│   ├── run.py               # Точка входа
+│   └── data/                # Сохранённые JSON
+├── exports/                 # Экспортированные JSON
+├── interface.py             # Интерфейс управления
+├── run_all.py               # Планировщик
+├── requirements.txt         # Зависимости
+└── README.md                # Этот файл
 ```
 
 ## Установка
@@ -70,16 +77,48 @@ psql -U postgres -c "CREATE DATABASE goszakupki ENCODING 'UTF8';"
 python -c "from shared.database import db; db.init_db()"
 ```
 
+### 7. Установить Ollama и скачать модель
+
+Скачать с https://ollama.com/download/windows и установить.
+
+```bash
+ollama pull deepseek-r1:8b
+```
+
+### 8. Настроить Kaggle API
+
+Получить `kaggle.json` на https://www.kaggle.com/settings и поместить в `C:\Users\Ева\.kaggle\`.
+
 ## Использование
+
+### Интерфейс управления
+
+```bash
+python interface.py
+```
+
+| Пункт | Действие |
+|-------|----------|
+| 1 | Парсер госзакупок |
+| 2 | Парсер хакатонов |
+| 3 | Парсер новостей |
+| 4 | Импорт данных в БД |
+| 5 | Анализ новых данных (LLM) |
+| 6 | Просмотр БД |
+| 7 | AI-кейсы |
+| 8 | Экспорт таблицы в JSON |
+| 9 | Все модули сбора |
+| 0 | Выход |
 
 ### Запуск отдельных модулей
 
 ```bash
-python -m goszakupki.run      # Госзакупки (поиск AI-контрактов)
-python -m hackathons.run      # Хакатоны (сбор с Kaggle)
-python -m news.run            # Новости (Хабр, ТАСС, Интерфакс)
-python -m shared.import_data  # Импорт всех JSON в БД
-python -m shared.view_db      # Просмотр содержимого БД
+python -m goszakupki.run      # Госзакупки
+python -m hackathons.run      # Хакатоны
+python -m news.run            # Новости
+python -m analytics.run       # Анализ через LLM
+python -m shared.import_data  # Импорт в БД
+python -m shared.view_db      # Просмотр БД
 ```
 
 ### Планировщик
@@ -87,8 +126,6 @@ python -m shared.view_db      # Просмотр содержимого БД
 ```bash
 python run_all.py
 ```
-
-Расписание по умолчанию:
 
 | Задача | Период |
 |--------|--------|
@@ -114,8 +151,16 @@ PostgreSQL, 5 таблиц:
 | contracts | Госконтракты |
 | news | Новости |
 | hackathons | Хакатоны |
-| ai_insights | Найденные AI-кейсы (аналитика) |
-| analytics_log | Логи аналитического модуля |
+| ai_insights | AI-кейсы |
+| analytics_log | Логи аналитики |
+
+## Аналитический модуль
+
+Локальная LLM через Ollama:
+- Модель: `deepseek-r1:8b`
+- Статусы инсайтов: `new` (свежие) / `old` (предыдущие)
+- Анализируются только записи со статусом `new`
+- После анализа статус источника меняется на `analyzed`
 
 ## Фильтры
 
@@ -132,3 +177,7 @@ PostgreSQL, 5 таблиц:
 ### Новости
 
 - Без фильтрации, сохраняются все для последующего анализа
+
+## Экспорт
+
+Через интерфейс (пункт 8) можно экспортировать любую таблицу в JSON. Файлы сохраняются в папку `exports/`.

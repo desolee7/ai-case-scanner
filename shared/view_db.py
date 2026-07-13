@@ -34,4 +34,20 @@ for row in s.execute(text('SELECT title, organizer, end_date, topics FROM hackat
     print(f'  topics: {row[3]}')
     print()
 
+# AI Insights
+print('--- AI_INSIGHTS (найденные AI-кейсы) ---')
+print(f'Всего: {s.execute(text("SELECT count(*) FROM ai_insights")).scalar()}')
+for row in s.execute(text('SELECT source_type, title, confidence_score, potential_ai_solution FROM ai_insights')):
+    print(f'  [{row[0]}] {row[1]}')
+    print(f'  confidence: {row[2]}')
+    print(f'  solution: {row[3][:150]}')
+    print()
+
+# Analytics Log
+print('--- ANALYTICS_LOG (логи) ---')
+print(f'Всего: {s.execute(text("SELECT count(*) FROM analytics_log")).scalar()}')
+for row in s.execute(text('SELECT source_type, model_used, created_at FROM analytics_log LIMIT 3')):
+    print(f'  [{row[0]}] model: {row[1]} | date: {row[2]}')
+    print()
+
 s.close()

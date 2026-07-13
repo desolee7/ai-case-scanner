@@ -1,26 +1,25 @@
 # Виртуальное окружение
 venv/
-env/
-.env
-
-# Файлы Python
 __pycache__/
 *.pyc
-*.pyo
-*.pyd
-.Python
 
-# Данные
-data/
-*.db
-*.sqlite
+# Данные (JSON, документы, экспорт)
+goszakupki/data/
+hackathons/data/
+news/data/
+exports/
+*.json
+*.pdf
+*.doc
+*.docx
+*.zip
+
+# Конфиденциальное
+.env
+kaggle.json
+.kaggle/
 
 # IDE
 .vscode/
 .idea/
 *.swp
-*.swo
-
-# Kaggle
-kaggle.json
-.kaggle/
