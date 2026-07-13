@@ -1,0 +1,26 @@
+# Виртуальное окружение
+venv/
+env/
+.env
+
+# Файлы Python
+__pycache__/
+*.pyc
+*.pyo
+*.pyd
+.Python
+
+# Данные
+data/
+*.db
+*.sqlite
+
+# IDE
+.vscode/
+.idea/
+*.swp
+*.swo
+
+# Kaggle
+kaggle.json
+.kaggle/
