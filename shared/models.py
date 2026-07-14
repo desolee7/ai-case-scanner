@@ -68,6 +68,8 @@ class AIInsight(Base):
     detected_keywords = Column(Text)
     confidence_score = Column(Float)
     model_version = Column(String(50))
+    source_url = Column(String(500))
+    dataset_suggestion = Column(Text)
     status = Column(String(50), default='new')
     created_at = Column(DateTime, default=datetime.utcnow)
     updated_at = Column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)

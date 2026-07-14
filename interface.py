@@ -17,41 +17,79 @@ def run_module(module):
 
 
 def show_insights():
-    print("\n" + "=" * 50)
-    print("AI-КЕЙСЫ")
-    print("=" * 50)
-    s = db.get_session()
+    while True:
+        print("\n" + "=" * 50)
+        print("AI-КЕЙСЫ")
+        print("=" * 50)
+        s = db.get_session()
+        
+        new_rows = s.execute(text(
+            "SELECT id, source_type, title, confidence_score, potential_ai_solution, dataset_suggestion, source_url "
+            "FROM ai_insights WHERE status = 'new' "
+            "ORDER BY confidence_score DESC"
+        )).fetchall()
+        
+        if new_rows:
+            print("\n--- НОВЫЕ ---")
+            for r in new_rows:
+                print(f"\n  [{r[0]}] [{r[1]}] {r[2][:70]}")
+                print(f"  Уверенность: {r[3]}")
+                print(f"  Решение: {r[4][:200]}")
+                if r[5]:
+                    print(f"  Датасет: {r[5][:150]}")
+                if r[6]:
+                    print(f"  Ссылка: {r[6]}")
+        else:
+            print("\nНовых AI-кейсов нет")
+        
+        old_rows = s.execute(text(
+            "SELECT id, source_type, title, status, source_url "
+            "FROM ai_insights WHERE status != 'new' "
+            "ORDER BY updated_at DESC LIMIT 10"
+        )).fetchall()
+        
+        if old_rows:
+            print("\n--- ОБРАБОТАННЫЕ (последние 10) ---")
+            for r in old_rows:
+                print(f"  [{r[0]}] [{r[1]}] [{r[3]}] {r[2][:70]}")
+        
+        s.close()
+        
+        print("\nДействия:")
+        print("  Введите ID кейса для изменения статуса")
+        print("  0 — назад")
+        
+        choice = input("\nID или 0: ").strip()
+        
+        if choice == '0':
+            break
+        
+        if choice.isdigit():
+            change_status(int(choice))
+            input("\nНажмите Enter...")
+
+
+def change_status(insight_id):
+    print("\nНовый статус:")
+    print("1. reviewed (просмотрен)")
+    print("2. approved (подтверждён)")
+    print("3. rejected (отклонён)")
     
-    # Новые
-    new_rows = s.execute(text(
-        "SELECT source_type, title, confidence_score, potential_ai_solution "
-        "FROM ai_insights WHERE status = 'new' "
-        "ORDER BY confidence_score DESC"
-    )).fetchall()
+    choice = input("Выберите: ").strip()
     
-    if new_rows:
-        print("\n--- НОВЫЕ ---")
-        for i, r in enumerate(new_rows, 1):
-            print(f"\n{i}. [{r[0]}] {r[1]}")
-            print(f"   Уверенность: {r[2]}")
-            print(f"   Решение: {r[3][:200]}")
+    statuses = {'1': 'reviewed', '2': 'approved', '3': 'rejected'}
+    
+    if choice in statuses:
+        s = db.get_session()
+        s.execute(
+            text("UPDATE ai_insights SET status = :status WHERE id = :id"),
+            {"status": statuses[choice], "id": insight_id}
+        )
+        s.commit()
+        s.close()
+        print(f"Статус изменён на '{statuses[choice]}'")
     else:
-        print("\nНовых AI-кейсов нет")
-    
-    # Старые
-    old_rows = s.execute(text(
-        "SELECT source_type, title, confidence_score, potential_ai_solution "
-        "FROM ai_insights WHERE status != 'new' "
-        "ORDER BY created_at DESC LIMIT 10"
-    )).fetchall()
-    
-    if old_rows:
-        print("\n--- ОБРАБОТАННЫЕ (последние 10) ---")
-        for i, r in enumerate(old_rows, 1):
-            print(f"\n{i}. [{r[0]}] {r[1]}")
-            print(f"   Уверенность: {r[2]}")
-    
-    s.close()
+        print("Неверный выбор")
 
 
 def export_table(table_name):
@@ -143,7 +181,6 @@ def main():
             run_module('shared.view_db')
         elif choice == '7':
             show_insights()
-            input("\nНажмите Enter для продолжения...")
         elif choice == '8':
             export_menu()
         elif choice == '9':

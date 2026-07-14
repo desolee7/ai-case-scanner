@@ -1,6 +1,7 @@
 """Анализатор данных через LLM"""
 import json
 import re
+import signal
 from analytics.llm_client import LLMClient
 from analytics.config import analytics_config
 from shared.database import db
@@ -30,7 +31,8 @@ AI-кейс — это задача, которую можно решить с �
   "title": "Краткое название AI-кейса (5-10 слов)",
   "potential_ai_solution": "Какое AI-решение можно предложить (2-3 предложения)",
   "confidence": 0.0-1.0,
-  "detected_keywords": ["ключевое", "слово"]
+  "detected_keywords": ["ключевое", "слово"],
+  "dataset_suggestion": "Какой датасет нужен для реализации (1-2 предложения)"
 }}
 
 Если это не AI-кейс, верни:
@@ -44,11 +46,17 @@ class AIAnalyzer:
     
     def __init__(self):
         self.llm = LLMClient()
+        self.stop_requested = False
+        signal.signal(signal.SIGINT, self._signal_handler)
+    
+    def _signal_handler(self, signum, frame):
+        print("\n\nПрерывание... Сохраняю прогресс.")
+        self.stop_requested = True
     
     def analyze_news(self, limit: int = None):
+        self.stop_requested = False
         session = db.get_session()
         
-        # Помечаем старые инсайты
         session.execute(text("UPDATE ai_insights SET status = 'old' WHERE status = 'new'"))
         session.commit()
         
@@ -60,6 +68,10 @@ class AIAnalyzer:
         session.close()
         
         for row in rows:
+            if self.stop_requested:
+                print("Анализ прерван пользователем.")
+                break
+            
             prompt = PROMPT_TEMPLATE.format(
                 source=row[1],
                 source_type='news',
@@ -71,9 +83,9 @@ class AIAnalyzer:
                 self._process_response(response, 'news', row[0], prompt)
     
     def analyze_hackathons(self, limit: int = None):
+        self.stop_requested = False
         session = db.get_session()
         
-        # Помечаем старые инсайты
         session.execute(text("UPDATE ai_insights SET status = 'old' WHERE status = 'new'"))
         session.commit()
         
@@ -85,6 +97,10 @@ class AIAnalyzer:
         session.close()
         
         for row in rows:
+            if self.stop_requested:
+                print("Анализ прерван пользователем.")
+                break
+            
             prompt = PROMPT_TEMPLATE.format(
                 source=row[1],
                 source_type='hackathon',
@@ -98,7 +114,6 @@ class AIAnalyzer:
     def _process_response(self, response: str, source_type: str, source_id: int, prompt: str):
         session = db.get_session()
         
-        # Сохраняем лог
         log = AnalyticsLog(
             source_type=source_type,
             source_id=source_id,
@@ -108,7 +123,6 @@ class AIAnalyzer:
         )
         session.add(log)
         
-        # Парсим JSON
         try:
             data = json.loads(response)
         except json.JSONDecodeError:
@@ -122,21 +136,36 @@ class AIAnalyzer:
                 data = None
         
         if data and data.get('is_ai_case'):
+            if source_type == 'news':
+                row = session.execute(
+                    text("SELECT content, link FROM news WHERE id = :id"),
+                    {"id": source_id}
+                ).fetchone()
+            else:
+                row = session.execute(
+                    text("SELECT description, source_url FROM hackathons WHERE id = :id"),
+                    {"id": source_id}
+                ).fetchone()
+            
+            source_text = row[0] if row else ''
+            source_link = row[1] if row else ''
+            
             insight = AIInsight(
                 source_type=source_type,
                 source_id=source_id,
                 title=data.get('title', ''),
-                description=data.get('potential_ai_solution', ''),
+                description=source_text[:2000],
                 potential_ai_solution=data.get('potential_ai_solution', ''),
                 detected_keywords=json.dumps(data.get('detected_keywords', [])),
                 confidence_score=data.get('confidence', 0),
                 model_version=analytics_config.MODEL,
+                source_url=source_link,
+                dataset_suggestion=data.get('dataset_suggestion', ''),
                 status='new',
             )
             session.add(insight)
             print(f"  AI-кейс: {data.get('title', '')[:80]}")
         
-        # Обновляем статус источника
         table = 'news' if source_type == 'news' else 'hackathons'
         session.execute(
             text(f"UPDATE {table} SET status = 'analyzed' WHERE id = :id"),
@@ -145,4 +174,3 @@ class AIAnalyzer:
         
         session.commit()
         session.close()
-        
