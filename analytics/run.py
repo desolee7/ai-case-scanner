@@ -15,6 +15,9 @@ def main():
     
     print("\n--- НОВОСТИ ---")
     analyzer.analyze_news()
+    
+    print("\n--- КОНТРАКТЫ ---")
+    analyzer.analyze_contracts(limit=20)
 
 
 if __name__ == '__main__':

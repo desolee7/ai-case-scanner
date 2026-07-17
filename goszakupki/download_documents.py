@@ -1,9 +1,9 @@
 """
-Скачивание файлов контрактов по прямым ссылкам из Clearspending API.
+Скачивание файлов контрактов через curl.exe (поддерживает ГОСТ сертификаты).
 """
+import subprocess
 import time
 from pathlib import Path
-import requests
 from shared.config import config
 
 
@@ -15,22 +15,11 @@ class ContractDownloader:
             download_dir = Path(__file__).parent / 'data' / 'documents'
         self.download_dir = Path(download_dir)
         self.download_dir.mkdir(parents=True, exist_ok=True)
-        
-        self.session = requests.Session()
-        self.session.headers.update({
-            'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36',
-        })
     
     def download_contract_files(self, regnum: str, files: list) -> list:
-        """
-        Скачать все файлы одного контракта.
+        if not regnum or regnum == 'unknown':
+            return []
         
-        Параметры:
-        - regnum: реестровый номер контракта
-        - files: список словарей с 'url' и 'fileName'
-        
-        Возвращает: список локальных путей к файлам
-        """
         contract_dir = self.download_dir / regnum
         contract_dir.mkdir(exist_ok=True)
         
@@ -47,44 +36,46 @@ class ContractDownloader:
                 downloaded.append(str(filepath))
                 continue
             
-            try:
-                response = self.session.get(url, timeout=config.REQUEST_TIMEOUT)
-                response.raise_for_status()
-                
-                with open(filepath, 'wb') as f:
-                    f.write(response.content)
-                
+            if self._download_file(url, filepath):
                 downloaded.append(str(filepath))
-                time.sleep(0.3)  # пауза между файлами
-                
-            except Exception as e:
-                print(f"  ⚠ {filename}: {e}")
+                time.sleep(0.3)
+            else:
+                print(f"  {filename}: ошибка скачивания")
         
         return downloaded
     
     def download_from_contract(self, contract: dict) -> list:
-        """
-        Скачать файлы из метаданных контракта.
-        Использует поля 'scan' и 'attachments' из Clearspending.
-        """
-        regnum = contract.get('regnum', 'unknown')
+        regnum = contract.get('regnum') or contract.get('regNum', '')
         
-        # Собираем все файлы
         all_files = []
         
-        # Сканы (PDF)
         for scan in contract.get('scan', []):
             all_files.append(scan)
         
-        # Вложения
         for attachment in contract.get('attachments', {}).get('attachment', []):
             all_files.append(attachment)
         
         if not all_files:
             return []
         
+        if not regnum:
+            print(f"  (без номера): {len(all_files)} файлов - пропущено")
+            return []
+        
         print(f"  {regnum}: {len(all_files)} файлов...")
         return self.download_contract_files(regnum, all_files)
     
+    def _download_file(self, url: str, filepath: Path) -> bool:
+        try:
+            result = subprocess.run(
+                ['curl.exe', '-s', '-L', '-k', '--max-time', '120', '-o', str(filepath), url],
+                capture_output=True,
+                encoding='utf-8',
+                errors='replace'
+            )
+            return result.returncode == 0 and filepath.exists() and filepath.stat().st_size > 0
+        except Exception as e:
+            return False
+    
     def close(self):
-        self.session.close()
+        pass
